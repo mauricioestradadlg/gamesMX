@@ -63,50 +63,53 @@ app.get('/wallet-config', async (req, res) => {
 });
 
 
+
 app.post('/checkout-session', async (req, res) => {
   try {
-      console.log('Solicitud POST recibida en /checkout-session');
-      const { productos } = req.body;
+    console.log('Solicitud POST recibida en /checkout-session'); // Registro de consola
+    const { productos } = req.body;
 
-      const lineItems = productos.map((producto) => ({
-          price_data: {
-              currency: 'mxn',
-              product_data: {
-                  name: producto.nombre,
-              },
-              unit_amount: producto.precio * 100,
-          },
-          quantity: 1,
-      }));
+    const lineItems = productos.map((producto) => ({
+      price_data: {
+        currency: 'mxn',
+        product_data: {
+          name: producto.nombre,
+        },
+        unit_amount: producto.precio * 100,
+      },
+      quantity: 1,
+    }));
 
-      const session = await stripe.checkout.sessions.create({
-          payment_method_types: ['card'],
-          line_items: lineItems,
-          mode: 'payment',
-          success_url: 'http://localhost:3001/compraConfirmada',
-          cancel_url: 'http://localhost:3001/carrito',
-      });
 
-      const nombresProductos = productos.map(producto => producto.nombre).join(', ');
-      const total = productos.reduce((total, producto) => total + producto.precio, 0);
 
-      const query = 'INSERT INTO compras (productos, total) VALUES (?, ?)';
-      connection.query(query, [nombresProductos, total], (err, result) => {
-          if (err) {
-              console.error('Error al guardar la compra en la base de datos:', err);
-              res.status(500).json({ error: 'Error al guardar la compra en la base de datos' });
-              return;
-          }
-          console.log('Compra guardada correctamente en la base de datos');
-      });
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'payment',
+      success_url: 'http://localhost:3001/compraExitosa',
+      cancel_url: 'http://localhost:3001/carrito',
+    });
 
+    const total = productos.reduce((total, producto) => total + producto.precio, 0);
+
+    const query = 'INSERT INTO compras (productos, total) VALUES (?, ?)';
+    const values = [JSON.stringify(productos), total];
+
+    connection.query(query, values, (err, result) => {
+      if (err) {
+        console.error('Error al guardar la compra en la base de datos:', err);
+        res.status(500).json({ error: 'Error al guardar la compra en la base de datos' });
+        return;
+      }
+      console.log('Compra guardada correctamente en la base de datos');
       res.json({ sessionId: session.id });
+    });
+
   } catch (error) {
-      console.error('Error al crear el checkout session:', error);
-      res.status(500).json({ error: 'Error al crear el checkout session' });
+    console.error('Error al crear el checkout session:', error);
+    res.status(500).json({ error: 'Error al crear el checkout session' });
   }
 });
-
 
 
 const PORT = process.env.PORT || 3000;
